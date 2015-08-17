@@ -28,4 +28,5 @@
 *.app
 
 # Intermediate folders
-.build # ino build folder
+# # ino build folder
+.build
