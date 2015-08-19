@@ -5,8 +5,9 @@ static const bool debug = true;
 
 /*private*/
 void RestfulResponse::markReadyAndDisconnect() {
-  //TODO debug
+  if (debug) { Serial.println("markReadyAndDisconnect called"); }
   ready = true;
+  client.flush();
   client.stop(); // Disconnect when we're done reading
 }
 
@@ -26,8 +27,13 @@ int RestfulResponse::streamFromClient(char *buf, int maxLen) {
   return len;
 }
 
-RestfulResponse::RestfulResponse(Client& c) : client(c), contentLengthField("Content-Length: "), bodyDelimField("\r\n\r\n"), body(RESPONSE_READ_BUFFER_LEN), contentLength(0), inBody(false), ready(false) {}
+RestfulResponse::RestfulResponse(Client& c) : client(c), contentLengthField("Content-Length: "), bodyDelimField("\r\n\r\n"), body(RESPONSE_READ_BUFFER_LEN), contentLength(0), inBody(false), ready(false), timeoutTime(0), statusCode(STATUS_CODE_ERR_UNKNOWN) {}
+
 RestfulResponse::~RestfulResponse() {
+}
+
+void RestfulResponse::cancel() {
+  markReadyAndDisconnect();
 }
 
 const char *RestfulResponse::getBody() {
@@ -39,7 +45,7 @@ int RestfulResponse::getLength() {
 }
 
 int RestfulResponse::getStatusCode() {
-  return isReady() ? statusCodeField.getStatusCode() : -1;
+  return statusCode;//isReady() ? statusCodeField.getStatusCode() : -1;
 }
 
 bool RestfulResponse::isReady() {
@@ -59,15 +65,24 @@ bool RestfulResponse::run() {
     return true;
   }
 
+  if (timeoutTime > 0 && millis() >= timeoutTime) {
+    markReadyAndDisconnect();
+    statusCode = STATUS_CODE_ERR_TIMEOUT;
+    return true;
+  }
+
   char buf[RESPONSE_READ_BUFFER_LEN + 1] = {0};
   int len = 0;
   while ((len = streamFromClient(buf, RESPONSE_READ_BUFFER_LEN)) > 0) {
     buf[len] = 0;
-    if (debug) { Serial.print("Received: "); Serial.println(buf); }
+    if (debug) { Serial.print("Received: "); Serial.print(len); Serial.print(", "); Serial.println(buf); }
     if (!inBody) {
       statusCodeField.read(buf, len);
       contentLengthField.read(buf, len);
       bodyDelimField.read(buf, len);
+      if (statusCodeField.isInterpreted()) {
+        statusCode = statusCodeField.getStatusCode();
+      }
       inBody = bodyDelimField.isMatched();
       if (inBody) {
         if (debug) { Serial.println("In body!"); }
@@ -84,18 +99,21 @@ bool RestfulResponse::run() {
         body.append(&buf[skip], len - skip);
       }
     } else {
+  //    Serial.println("APPENDIN");
       body.append(buf, len);
     }
+//    Serial.println("LEWPIN");
   }
-
+//Serial.print("PRE_EXITIN:");
+//Serial.println(inBody);
 //  Serial.println(body.getLength());
 //  Serial.println(body);
   // In some circumstances, the content length is smaller than the total bytes read...
   // Content-Length should be gospel, so we accept it and then truncate the body string
   // EXCEPT if the connection is closed.  We can also look for the Connection: close header
   // TODO: maybe have "expected lenght" as a field in CharBuffer, so this becomes if (inBody && body.receivedAll())...
-  if (inBody && (contentLength > 0 && contentLength <= body.getLength()) ||
-                (contentLength == 0 && !client.connected())) {
+  if (inBody && ((contentLength > 0 && contentLength <= body.getLength()) ||
+                 (contentLength == 0 && !client.connected()))) {
     if (contentLength > 0) {
       body.truncAt(contentLength);
     } else { //TODO: this should be automatic
@@ -104,6 +122,7 @@ bool RestfulResponse::run() {
     markReadyAndDisconnect();
   }
 
+  if (debug) { Serial.print("Exiting.  Ready? "); Serial.println(ready ? "true" : "false"); }
   return ready;
 }
 #if 0
@@ -125,3 +144,7 @@ bool RestfulResponse::run() {
     memcpy(&response[responseLength], buf, len);
     resopnseLength += len;
 #endif
+
+void RestfulResponse::setTimeoutTime(long timeoutTime) {
+  this->timeoutTime = timeoutTime;
+}

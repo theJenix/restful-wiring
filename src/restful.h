@@ -32,7 +32,7 @@ private:
 protected:
   RestfulOperation(Client& c, RestfulResponse& theResponse, const char *h); //const IPAddress& localIP);
   
-  RestfulOperation& methodAndUri(const char *method, const char *uri);
+  RestfulOperation& methodAndUri(const char *method, const char* uriPre, const char *uri);
 
 public:
   RestfulOperation& header(const char *key, const char *value);
@@ -64,8 +64,9 @@ private:
   // just assume one response at a time
   RestfulResponse *theResponse;
 //  const IPAddress& localIP;
-  const char *host;
-  int port;
+  char *host;
+  int  port;
+  char *pathPrefix;
 
   void clearTheResponse();
   bool connect();
@@ -74,7 +75,8 @@ private:
   void writeStandardHeaders(RestfulOperation& op);
 
 public:
-  RestfulClient(const char *host, int port); //const IPAddress& localIP);
+  RestfulClient(const char *host, int port, const char *pathPrefix); //const IPAddress& localIP);
+  virtual ~RestfulClient();
 
   /**
    * Request a resource from the connected system.

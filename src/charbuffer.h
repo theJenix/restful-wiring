@@ -7,10 +7,13 @@ private:
   int sizeMult;
   int length;
   int capacity;
+  int maxCapacity;
 
   void grow();
 public:
   CharBuffer(int s);
+  CharBuffer(int s, int m);
+  virtual ~CharBuffer();
 
   operator const char *() const {
     return buffer;

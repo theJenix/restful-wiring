@@ -26,13 +26,14 @@ void KeyedField::read(const char *buf, int len) {
   if (interpreted) {
     return;
   }
-  if (debug) { Serial.print("("); Serial.print(keyword); Serial.print(") Reading: "); Serial.println(buf); }
+  if (debug) { Serial.print("("); Serial.print(keyword); Serial.print(") Reading: "); Serial.print(len); Serial.print(", "); Serial.println(buf); }
   // Try to start a match
   int start = 0;
   if (!matched) {
     if (ptr == keyword) {
       if (debug) { Serial.println("Not in a match yet."); }
       for (int ii = 0; ii < len; ++ii) {
+        if (debug) { printChar(*ptr); Serial.print("=?"); printChar(buf[ii]); Serial.print(", "); }
         if (*ptr == buf[ii]) {
           if (debug) { Serial.println("Found a match!"); }
           // Found a match!
@@ -67,7 +68,15 @@ void KeyedField::read(const char *buf, int len) {
   if (matched) {
     if (debug) { Serial.print("Found a match: "); Serial.print(keyword); Serial.print(", To be interpreted: "); Serial.println(&buf[start]); }
     interpreted = interpret(&buf[start], len - start);
+    if (debug) {
+      if (interpreted) {
+        Serial.println("Interpreted!");
+      } else {
+        Serial.println("More to interpret...");
+      }
+    }
   }
+  if (debug) { Serial.println("Exiting KeyedField::read"); }
 }
 
 int KeyedField::getBytesToSkip() {

@@ -19,13 +19,17 @@ void RestfulOperation::write(const char *string) {
   dirty = true;
   if (debug) { Serial.print("Writing: "); Serial.println(string); }
   //TODO: debug info
-  client.write((uint8_t *)string, strlen(string));
+  client.print(string); //, strlen(string));
+  delay(10);
 }
 
 /*protected*/
-RestfulOperation& RestfulOperation::methodAndUri(const char *method, const char *uri) {
+RestfulOperation& RestfulOperation::methodAndUri(const char *method, const char *uriPre, const char *uri) {
   write(method);
   write(" ");
+  if (uriPre && *uriPre) {
+    write(uriPre);
+  }
   write(uri);
   write(" HTTP/1.1\r\n"); 
   return *this;
@@ -73,8 +77,10 @@ RestfulResponse& RestfulOperation::waitForResponse() {
 /*private*/
 void RestfulClient::clearTheResponse() {
   if (theResponse) {
+    if (debug) { Serial.println("Deleting the response"); }
     delete theResponse;
   }
+  if (debug) { Serial.println("Allocating the response"); }
   theResponse = new RestfulResponse(client);
 }
 /*private*/
@@ -82,12 +88,35 @@ bool RestfulClient::connect() {
   uint8_t addr[4] = {0};
 //  int count = sscanf(host, "%hhu%.%hhu%.%hhu%.%hhu", &addr[0], &addr[1], &addr[2], &addr[3]);
   int count = parseIP(host, addr);
+#if 0
+  if (count < 4) {
+    count = 4;
+
+    static uint32_t ip_addr = 0;
+
+
+    if (ip_addr == 0)
+      gethostbyname((char*)host, strlen(host), &ip_addr);
+    addr[0] = BYTE_N(ip_addr, 3);
+    addr[1] = BYTE_N(ip_addr, 2);
+    addr[2] = BYTE_N(ip_addr, 1);
+    addr[3] = BYTE_N(ip_addr, 0);
+  }
+#endif
   if (count < 4) {
     Serial.print("Connecting to host: "); Serial.println(host);
-    return client.connect(host, port);
+    bool conn = client.connect(host, port);
+    Serial.print("Connected? ");  Serial.println(conn ? "true" : "false");
+    // Delay seems to be required for interfacing Spark Core with a heroku app (otherwise, it
+    // can get into a mode where it never resolves the host name).
+    delay(100);
+    return conn;
   } else {
-    Serial.print("Connecting to address: "); Serial.println(host);
-    return client.connect(addr, port);
+    Serial.print("Connecting to address: "); Serial.print(addr[0]); Serial.print("."); Serial.print(addr[1]);Serial.print("."); Serial.print(addr[2]); Serial.print("."); Serial.println(addr[3]);
+    bool conn = client.connect(addr, port);
+    Serial.print("Connected? ");  Serial.println(conn ? "true" : "false");
+    delay(100);
+    return conn;
   }
 }
 
@@ -116,7 +145,7 @@ int RestfulClient::parseIP(const char *possibleIP, uint8_t addr[4]) {
 
 /*private*/
 void RestfulClient::writeMethodAndPath(RestfulOperation& op, const char *method, const char *path) {
-  op.methodAndUri(method, path);
+  op.methodAndUri(method, pathPrefix, path);
 }
 
 /*private*/
@@ -126,12 +155,30 @@ void RestfulClient::writeStandardHeaders(RestfulOperation& op) {
   op.header("Host", host);
 }
 
-RestfulClient::RestfulClient(const char *host, int port) : theResponse(NULL), host(host), port(port) {}
+RestfulClient::RestfulClient(const char *host, int port, const char *pathPrefix) : theResponse(NULL) {
+  this->host = (char *)malloc(strlen(host) + 1);
+  strcpy(this->host, host);
+  this->port = port;
+  this->pathPrefix = (char *)malloc(strlen(pathPrefix) + 2);
+  char *ptr = this->pathPrefix;
+  if (*pathPrefix != 0 && *pathPrefix != '/') {
+    *ptr++ = '/';
+  }
+  strcpy(ptr, pathPrefix);
+}
+
+RestfulClient::~RestfulClient() {
+  if (theResponse) {
+    delete theResponse;
+  }
+  free(this->host);
+  free(this->pathPrefix);
+}
 
 RestfulOperation RestfulClient::get(const char *uri) {
+  bool connected = connect();
   clearTheResponse();
   RestfulOperation op(client, *theResponse, host);
-  bool connected = connect();
   if (connected) {
     Serial.println("Connected");
     writeMethodAndPath(op, "GET", uri);
@@ -141,9 +188,9 @@ RestfulOperation RestfulClient::get(const char *uri) {
 }
 
 RestfulOperation RestfulClient::post(const char *uri) {
+  bool connected = connect();
   clearTheResponse();
   RestfulOperation op(client, *theResponse, host);
-  bool connected = connect();
   if (connected) {
     Serial.println("Connected");
     writeMethodAndPath(op, "POST", uri);
@@ -153,9 +200,9 @@ RestfulOperation RestfulClient::post(const char *uri) {
 }
 
 RestfulOperation RestfulClient::put(const char *uri) {
+  bool connected = connect();
   clearTheResponse();
   RestfulOperation op(client, *theResponse, host);
-  bool connected = connect();
   if (connected) {
     Serial.println("Connected");
     writeMethodAndPath(op, "PUT", uri);
@@ -165,9 +212,9 @@ RestfulOperation RestfulClient::put(const char *uri) {
 }
 
 RestfulOperation RestfulClient::del(const char *uri) {
+  bool connected = connect();
   clearTheResponse();
   RestfulOperation op(client, *theResponse, host);
-  bool connected = connect();
   if (connected) {
     Serial.println("Connected");
     writeMethodAndPath(op, "DELETE", uri);
