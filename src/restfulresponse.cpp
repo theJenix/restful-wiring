@@ -1,7 +1,7 @@
 
 #include "restfulresponse.h"
 
-static const bool debug = true;
+static const bool debug = false;
 
 /*private*/
 void RestfulResponse::markReadyAndDisconnect() {
