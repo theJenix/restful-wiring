@@ -27,7 +27,7 @@ int RestfulResponse::streamFromClient(char *buf, int maxLen) {
   return len;
 }
 
-RestfulResponse::RestfulResponse(Client& c) : client(c), contentLengthField("Content-Length: "), bodyDelimField("\r\n\r\n"), body(RESPONSE_READ_BUFFER_LEN), contentLength(0), inBody(false), ready(false), timeoutTime(0), statusCode(STATUS_CODE_ERR_UNKNOWN) {}
+RestfulResponse::RestfulResponse(Client& c) : client(c), contentLengthField("Content-Length: "), bodyDelimField("\r\n\r\n"), body(RESPONSE_READ_BUFFER_LEN), contentLength(-1), inBody(false), ready(false), timeoutTime(0), statusCode(STATUS_CODE_ERR_UNKNOWN) {}
 
 RestfulResponse::~RestfulResponse() {
 }
@@ -112,8 +112,8 @@ bool RestfulResponse::run() {
   // Content-Length should be gospel, so we accept it and then truncate the body string
   // EXCEPT if the connection is closed.  We can also look for the Connection: close header
   // TODO: maybe have "expected lenght" as a field in CharBuffer, so this becomes if (inBody && body.receivedAll())...
-  if (inBody && ((contentLength > 0 && contentLength <= body.getLength()) ||
-                 (contentLength == 0 && !client.connected()))) {
+  if (inBody && (contentLengthField.isInterpreted() && contentLength <= body.getLength()) ||
+                (!contentLengthField.isInterpreted() && !client.connected())) {
     if (contentLength > 0) {
       body.truncAt(contentLength);
     } else { //TODO: this should be automatic
