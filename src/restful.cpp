@@ -104,7 +104,7 @@ bool RestfulClient::connect() {
   }
 #endif
   if (count < 4) {
-    Serial.print("Connecting to host: "); Serial.println(host);
+    Serial.print("Connecting to host: "); Serial.print(host); Serial.print(", port: "); Serial.println(port);
     bool conn = client.connect(host, port);
     Serial.print("Connected? ");  Serial.println(conn ? "true" : "false");
     // Delay seems to be required for interfacing Spark Core with a heroku app (otherwise, it

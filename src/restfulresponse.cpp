@@ -61,6 +61,12 @@ bool RestfulResponse::run() {
   
   if (!client.connected()) {
     // Client disconnected...we'll take what we got
+    // NOTE: in some cases, this is standard operations (e.g. when Content-Length is omitted)
+    // and in others, its a safety precaution
+    // TODO: reeval this as a safety precaution...unclear what we should actually do in the
+    // case where Content-Length is present but we didn't receive it all.  Probably an HTTP
+    // error code for this..
+    body.truncAt(body.getLength());
     markReadyAndDisconnect();
     return true;
   }
